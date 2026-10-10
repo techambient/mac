@@ -11,37 +11,32 @@ jobs:
       - name: Checkout Code Repository
         uses: actions/checkout@v4
 
-      - name: Setup Live Cloudflare VNC Session
+      - name: Setup User-Space TigerVNC Server
         run: |
-          echo "=== Configuring Local Desktop Admin User ==="
-          sudo dscl . -passwd /Users/runner "MacDebug2026!" || true
+          echo "=== Installing TigerVNC Server and Cloudflare ==="
+          brew install tigervnc cloudflare/cloudflare/cloudflared
           
-          echo "=== Activating Apple Screen Sharing Server ==="
-          # 1. Enable remote management and assign privileges cleanly
-          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
-            -activate -configure -access -on -privs -all || true
+          echo "=== Configuring VNC Password ==="
+          # Creates the hidden directory and injects the encrypted password cleanly
+          mkdir -p ~/.vnc
+          echo "MacDebug2026!" | vncpasswd -f > ~/.vnc/passwd
+          chmod 600 ~/.vnc/passwd
           
-          # 2. Set the secure VNC authentication password using the correct flag syntax
-          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
-            -configure -clientopts -setvnclegacy yes -setvncpw "MacDebug2026!" || true
-          
-          # 3. Force a restart of the agent daemon to apply the new password profile
-          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
-            -restart -agent || true
+          echo "=== Starting VNC Server on Display :1 (Port 5901) ==="
+          # Launches the desktop server under the current active user space
+          vncserver :1 -geometry 1280x800 -localhost no || true
           
           echo "=== Giving the VNC Server Time to Bind Sockets ==="
           sleep 5
           
-          # Diagnostic check: Verify if the system is actively listening on port 5900
-          sudo lsof -i :5900 || echo "⚠️ Warning: Port 5900 does not appear to be open yet!"
-          
-          echo "=== Initializing Cloudflare Zero-Trust Tunnel ==="
-          brew install cloudflare/cloudflare/cloudflared
+          # Diagnostic check: Verify port 5901 is actively listening
+          sudo lsof -i :5901 || echo "⚠️ Warning: Port 5901 does not appear to be open yet!"
           
           echo "=========================================================="
           echo " LOOK AT THE LOG LINES BELOW FOR YOUR .trycloudflare.com URL"
-          echo " Connect with Username: runner | Password: MacDebug2026!"
+          echo " Connect with Password: MacDebug2026!"
           echo "=========================================================="
           
-          cloudflared tunnel --url tcp://127.0.0.1:5900 &
+          # Bind Cloudflare specifically to port 5901 (where TigerVNC runs)
+          cloudflared tunnel --url tcp://127.0.0.1:5901 &
           sleep 1800
