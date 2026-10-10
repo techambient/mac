@@ -1,0 +1,48 @@
+name: macOS Free Desktop UI Automation
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  execute-desktop-test:
+    # Points to the free M-series Apple Silicon runner for public repositories
+    runs-on: macos-latest 
+
+    steps:
+      - name: Checkout Code Repository
+        uses: actions/checkout@v4
+
+      - name: Initialize Node.js Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Project Dependencies
+        run: |
+          npm init -y
+          npm install playwright
+
+      - name: Install Playwright Browser Binaries
+        run: npx playwright install --with-deps
+
+      - name: Configure macOS TCC Permissions for Desktop Interaction
+        run: |
+          echo "Bypassing macOS security gates for terminal interaction..."
+          # This inserts terminal automation allowance into the macOS background database
+          sudo sqlite3 "/Library/Application Support/com.apple.TCC/TCC.db" \
+            "INSERT OR REPLACE INTO access VALUES('kTCCServiceScreenCapture','com.apple.Terminal',0,2,4,1,NULL,NULL,0,'UNUSED',NULL,0,1700820626);"
+
+      - name: Execute UI Tests on Active Window Server
+        run: node tests/run_ui_test.js
+
+      - name: Extract and Upload Visual Artifacts (Screenshots & Videos)
+        if: always() # Runs even if the test step crashes
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-gui-test-results
+          path: |
+            screenshots/
+            videos/
