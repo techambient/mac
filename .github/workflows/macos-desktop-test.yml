@@ -17,14 +17,19 @@ jobs:
           sudo dscl . -passwd /Users/runner "MacDebug2026!" || true
           
           echo "=== Activating Apple Screen Sharing Server ==="
-          # Configure permissions and force-restart the agent daemon
+          # 1. Enable remote management and assign privileges cleanly
           sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
-            -activate -configure -access -on \
-            -clientopts -setvncpasswd -vncpasswd "MacDebug2026!" \
-            -restart -agent -privs -all || true
+            -activate -configure -access -on -privs -all || true
+          
+          # 2. Set the secure VNC authentication password using the correct flag syntax
+          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
+            -configure -clientopts -setvnclegacy yes -setvncpw "MacDebug2026!" || true
+          
+          # 3. Force a restart of the agent daemon to apply the new password profile
+          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
+            -restart -agent || true
           
           echo "=== Giving the VNC Server Time to Bind Sockets ==="
-          # A brief pause to ensure port 5900 transitions into an active listening state
           sleep 5
           
           # Diagnostic check: Verify if the system is actively listening on port 5900
@@ -38,6 +43,5 @@ jobs:
           echo " Connect with Username: runner | Password: MacDebug2026!"
           echo "=========================================================="
           
-          # Bind the tunnel explicitly to the IPv4 loopback to avoid IPv6 [::1] connection issues
           cloudflared tunnel --url tcp://127.0.0.1:5900 &
           sleep 1800
