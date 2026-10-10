@@ -13,22 +13,27 @@ jobs:
 
       - name: Setup User-Space TigerVNC Server
         run: |
+          echo "=== Configuring Homebrew Security Variables ==="
+          # Force Homebrew to bypass interactive tap validation blocks
+          export HOMEBREW_NO_REQUIRE_TAP_TRUST=1
+          
+          echo "=== Tapping and Trusting Cloudflare Core Repositories ==="
+          brew tap cloudflare/cloudflare
+          brew trust cloudflare/cloudflare || true
+          
           echo "=== Installing TigerVNC Server and Cloudflare ==="
           brew install tigervnc cloudflare/cloudflare/cloudflared
           
           echo "=== Defining Executable Application Paths ==="
-          # Map the hidden app bundle binaries to local environment variables
           TIGER_VNC_PASSWD="/Applications/TigerVNC.app/Contents/MacOS/vncpasswd"
           TIGER_VNC_SERVER="/Applications/TigerVNC.app/Contents/MacOS/vncserver"
           
           echo "=== Configuring VNC Password ==="
           mkdir -p ~/.vnc
-          # Call the tool using its absolute app container path
           $TIGER_VNC_PASSWD -f > ~/.vnc/passwd <<< "MacDebug2026!"
           chmod 600 ~/.vnc/passwd
           
           echo "=== Starting VNC Server on Display :1 (Port 5901) ==="
-          # Execute the standalone server loop out of the application package
           $TIGER_VNC_SERVER :1 -geometry 1280x800 -localhost no || true
           
           echo "=== Giving the VNC Server Time to Bind Sockets ==="
