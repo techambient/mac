@@ -1,13 +1,7 @@
 name: Live Interactive macOS Desktop Debugger
 
 on:
-  workflow_dispatch:
-    # This block defines the input field that appears when clicking the "Run workflow" button
-    inputs:
-      ngrok_token:
-        description: 'Paste your Ngrok Authtoken here'
-        required: true
-        type: string
+  workflow_dispatch: # Interactive runtime trigger directly via Actions panel
 
 jobs:
   interactive-desktop-session:
@@ -17,10 +11,7 @@ jobs:
       - name: Checkout Code Repository
         uses: actions/checkout@v4
 
-      - name: Setup Live Desktop Control Session
-        env:
-          # Reads directly from your manual button input instead of the repository secrets block
-          NGROK_AUTH_TOKEN: ${{ github.event.inputs.ngrok_token }}
+      - name: Setup Live Cloudflare VNC Session
         run: |
           echo "=== Configuring Local Desktop Admin User ==="
           sudo dscl . -passwd /Users/runner "MacDebug2026!" || true
@@ -31,22 +22,16 @@ jobs:
             -clientopts -setvncpasswd -vncpasswd "MacDebug2026!" \
             -restart -agent -privs -all || true
           
-          echo "=== Initializing Secure Network Tunnel ==="
-          brew install ngrok
-          
-          # Clean execution gate to double-check that the manual text parameter isn't blank
-          if [ -z "$NGROK_AUTH_TOKEN" ]; then
-            echo "❌ ERROR: No Ngrok Authtoken provided in the prompt input field!"
-            exit 1
-          fi
-          
-          ngrok config add-authtoken "$NGROK_AUTH_TOKEN"
+          echo "=== Initializing Cloudflare Zero-Trust Tunnel ==="
+          # Install Cloudflare's tunneling binaries natively via Homebrew
+          brew install cloudflare/cloudflare/cloudflared
           
           echo "=========================================================="
-          echo " LOOK AT THE LOG LINES BELOW FOR YOUR NGROK TCP ADDRESS"
+          echo " LOOK AT THE LOG LINES BELOW FOR YOUR .trycloudflare.com URL"
           echo " Connect with Username: runner | Password: MacDebug2026!"
           echo "=========================================================="
           
-          # Bind the tunnel to the VNC network interface port (5900)
-          ngrok tcp 5900 --log=stdout &
+          # Create an ephemeral quick tunnel binding the macOS VNC interface (port 5900)
+          # Keeps the streaming channel socket open for up to 30 minutes (1800 seconds)
+          cloudflared tunnel --url tcp://localhost:5900 &
           sleep 1800
