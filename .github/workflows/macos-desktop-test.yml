@@ -16,15 +16,20 @@ jobs:
           echo "=== Installing TigerVNC Server and Cloudflare ==="
           brew install tigervnc cloudflare/cloudflare/cloudflared
           
+          echo "=== Defining Executable Application Paths ==="
+          # Map the hidden app bundle binaries to local environment variables
+          TIGER_VNC_PASSWD="/Applications/TigerVNC.app/Contents/MacOS/vncpasswd"
+          TIGER_VNC_SERVER="/Applications/TigerVNC.app/Contents/MacOS/vncserver"
+          
           echo "=== Configuring VNC Password ==="
-          # Creates the hidden directory and injects the encrypted password cleanly
           mkdir -p ~/.vnc
-          echo "MacDebug2026!" | vncpasswd -f > ~/.vnc/passwd
+          # Call the tool using its absolute app container path
+          $TIGER_VNC_PASSWD -f > ~/.vnc/passwd <<< "MacDebug2026!"
           chmod 600 ~/.vnc/passwd
           
           echo "=== Starting VNC Server on Display :1 (Port 5901) ==="
-          # Launches the desktop server under the current active user space
-          vncserver :1 -geometry 1280x800 -localhost no || true
+          # Execute the standalone server loop out of the application package
+          $TIGER_VNC_SERVER :1 -geometry 1280x800 -localhost no || true
           
           echo "=== Giving the VNC Server Time to Bind Sockets ==="
           sleep 5
@@ -37,6 +42,5 @@ jobs:
           echo " Connect with Password: MacDebug2026!"
           echo "=========================================================="
           
-          # Bind Cloudflare specifically to port 5901 (where TigerVNC runs)
           cloudflared tunnel --url tcp://127.0.0.1:5901 &
           sleep 1800
