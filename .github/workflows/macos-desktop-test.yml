@@ -1,47 +1,42 @@
-name: macOS Free Desktop UI Automation
+name: Live Interactive macOS Desktop Debugger
 
 on:
-  push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
+  workflow_dispatch: # Allows you to trigger this manually from the Actions tab
 
 jobs:
-  execute-desktop-test:
-    runs-on: macos-latest 
+  interactive-desktop-session:
+    runs-on: macos-latest
 
     steps:
       - name: Checkout Code Repository
         uses: actions/checkout@v4
 
-      - name: Initialize Node.js Environment
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Install Project Dependencies
+      - name: Setup Live Desktop Control Session
+        env:
+          NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
         run: |
-          npm init -y
-          npm install playwright
-
-      - name: Install Playwright Browser Binaries
-        run: npx playwright install --with-deps
-
-      - name: Configure macOS System Permissions
-        run: |
-          echo "Granting structural terminal automation privileges..."
-          # Uses Apple's built-in utility instead of raw database modifications
-          sudo tccutil reset ScreenCapture com.apple.Terminal || true
-          sudo tccutil reset Accessibility com.apple.Terminal || true
-
-      - name: Execute UI Tests on Active Window Server
-        run: node tests/run_ui_test.js
-
-      - name: Extract and Upload Visual Artifacts (Screenshots & Videos)
-        if: always() # Ensures logs upload even if your test assertions fail
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-gui-test-results
-          path: |
-            screenshots/
-            videos/
+          echo "=== Configuring Local Desktop Admin User ==="
+          # 1. Assign a secure connection password for the local 'runner' profile
+          sudo dscl . -passwd /Users/runner "MacDebug2026!"
+          
+          echo "=== Activating Apple Screen Sharing Server ==="
+          # 2. Fire up the native macOS Remote Management service
+          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
+            -activate -configure -access -on \
+            -clientopts -setvncpasswd -vncpasswd "MacDebug2026!" \
+            -restart -agent -privs -all
+          
+          echo "=== Initializing Secure Network Tunnel ==="
+          # 3. Deploy and authenticate the network forwarding engine
+          brew install ngrok
+          ngrok config add-authtoken $NGROK_AUTH_TOKEN
+          
+          echo "=========================================================="
+          echo " LOOK AT THE LOG LINES BELOW FOR YOUR NGROK TCP ADDRESS"
+          echo " Connect with Username: runner | Password: MacDebug2026!"
+          echo "=========================================================="
+          
+          # 4. Bind the tunnel to the VNC network interface port (5900)
+          # Keeps the connection socket open for a maximum of 30 minutes (1800 seconds)
+          ngrok tcp 5900 --log=stdout &
+          sleep 1800
