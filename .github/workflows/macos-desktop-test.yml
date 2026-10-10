@@ -1,7 +1,13 @@
 name: Live Interactive macOS Desktop Debugger
 
 on:
-  workflow_dispatch: # Allows manual execution from the Actions UI tab
+  workflow_dispatch:
+    # This block defines the input field that appears when clicking the "Run workflow" button
+    inputs:
+      ngrok_token:
+        description: 'Paste your Ngrok Authtoken here'
+        required: true
+        type: string
 
 jobs:
   interactive-desktop-session:
@@ -13,26 +19,24 @@ jobs:
 
       - name: Setup Live Desktop Control Session
         env:
-          NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
+          # Reads directly from your manual button input instead of the repository secrets block
+          NGROK_AUTH_TOKEN: ${{ github.event.inputs.ngrok_token }}
         run: |
           echo "=== Configuring Local Desktop Admin User ==="
-          # Assign a secure connection password for the local profile
           sudo dscl . -passwd /Users/runner "MacDebug2026!" || true
           
           echo "=== Activating Apple Screen Sharing Server ==="
-          # Fire up the native macOS Remote Management service
           sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
             -activate -configure -access -on \
             -clientopts -setvncpasswd -vncpasswd "MacDebug2026!" \
             -restart -agent -privs -all || true
           
           echo "=== Initializing Secure Network Tunnel ==="
-          # Deploy and authenticate the network forwarding engine
           brew install ngrok
           
-          # If your secret is missing, this will fail gracefully instead of crashing the job
+          # Clean execution gate to double-check that the manual text parameter isn't blank
           if [ -z "$NGROK_AUTH_TOKEN" ]; then
-            echo "❌ ERROR: NGROK_AUTH_TOKEN secret is empty! Please add it to GitHub Settings."
+            echo "❌ ERROR: No Ngrok Authtoken provided in the prompt input field!"
             exit 1
           fi
           
@@ -44,6 +48,5 @@ jobs:
           echo "=========================================================="
           
           # Bind the tunnel to the VNC network interface port (5900)
-          # Keeps the connection socket open for up to 30 minutes (1800 seconds)
           ngrok tcp 5900 --log=stdout &
           sleep 1800
