@@ -21,12 +21,14 @@ jobs:
           brew trust cloudflare/cloudflare || true
           
           echo "=== Installing TigerVNC Binaries and Cloudflare ==="
-          # tiger-vnc (with a hyphen) installs the CLI tools directly to your system PATH
           brew install tiger-vnc cloudflare/cloudflare/cloudflared
+          
+          echo "=== Injecting Homebrew Environment to Active Shell PATH ==="
+          # This guarantees that the shell can immediately locate vncpasswd and vncserver
+          eval "$(/opt/homebrew/bin/brew shellenv)"
           
           echo "=== Configuring VNC Password ==="
           mkdir -p ~/.vnc
-          # The binary is now natively available in the shell
           vncpasswd -f > ~/.vnc/passwd <<< "MacDebug2026!"
           chmod 600 ~/.vnc/passwd
           
