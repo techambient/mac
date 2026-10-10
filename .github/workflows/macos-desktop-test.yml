@@ -1,7 +1,7 @@
 name: Live Interactive macOS Desktop Debugger
 
 on:
-  workflow_dispatch: # Allows you to trigger this manually from the Actions tab
+  workflow_dispatch: # Allows manual execution from the Actions UI tab
 
 jobs:
   interactive-desktop-session:
@@ -16,27 +16,34 @@ jobs:
           NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
         run: |
           echo "=== Configuring Local Desktop Admin User ==="
-          # 1. Assign a secure connection password for the local 'runner' profile
-          sudo dscl . -passwd /Users/runner "MacDebug2026!"
+          # Assign a secure connection password for the local profile
+          sudo dscl . -passwd /Users/runner "MacDebug2026!" || true
           
           echo "=== Activating Apple Screen Sharing Server ==="
-          # 2. Fire up the native macOS Remote Management service
+          # Fire up the native macOS Remote Management service
           sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
             -activate -configure -access -on \
             -clientopts -setvncpasswd -vncpasswd "MacDebug2026!" \
-            -restart -agent -privs -all
+            -restart -agent -privs -all || true
           
           echo "=== Initializing Secure Network Tunnel ==="
-          # 3. Deploy and authenticate the network forwarding engine
+          # Deploy and authenticate the network forwarding engine
           brew install ngrok
-          ngrok config add-authtoken $NGROK_AUTH_TOKEN
+          
+          # If your secret is missing, this will fail gracefully instead of crashing the job
+          if [ -z "$NGROK_AUTH_TOKEN" ]; then
+            echo "❌ ERROR: NGROK_AUTH_TOKEN secret is empty! Please add it to GitHub Settings."
+            exit 1
+          fi
+          
+          ngrok config add-authtoken "$NGROK_AUTH_TOKEN"
           
           echo "=========================================================="
           echo " LOOK AT THE LOG LINES BELOW FOR YOUR NGROK TCP ADDRESS"
           echo " Connect with Username: runner | Password: MacDebug2026!"
           echo "=========================================================="
           
-          # 4. Bind the tunnel to the VNC network interface port (5900)
-          # Keeps the connection socket open for a maximum of 30 minutes (1800 seconds)
+          # Bind the tunnel to the VNC network interface port (5900)
+          # Keeps the connection socket open for up to 30 minutes (1800 seconds)
           ngrok tcp 5900 --log=stdout &
           sleep 1800
